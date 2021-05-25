@@ -1,0 +1,5 @@
+* text=auto
+
+*.inc text
+
+.gitattributes export-ignore
