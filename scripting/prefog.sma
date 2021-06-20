@@ -7,18 +7,20 @@ new g_iDDNum[MAX_PLAYERS + 1];
 new g_iPreDuckFog[MAX_PLAYERS + 1];
 new Float:g_flDuckGainSpeed[MAX_PLAYERS + 1];
 new Float:g_flPreDuckSpeed[MAX_PLAYERS + 1];
+new bool:g_bPerfectDucks[MAX_PLAYERS + 1];
 
 new g_iBhopNum[MAX_PLAYERS + 1];
 new g_iPreBhopFog[MAX_PLAYERS + 1];
 new Float:g_flBhopGainSpeed[MAX_PLAYERS + 1];
 new Float:g_flPreBhopSpeed[MAX_PLAYERS + 1];
-new bool:g_iPerfectBhops[MAX_PLAYERS + 1];
+new bool:g_bPerfectBhops[MAX_PLAYERS + 1];
 
 new bool:g_bLadderJump[MAX_PLAYERS + 1];
 new Float:g_flPreLadderSpeed[MAX_PLAYERS + 1];
 
 new g_iMoveType[MAX_PLAYERS + 1];
 new g_iObject;
+new bool:g_bPlrSgs[MAX_PLAYERS + 1];
 new bool:g_bFirstFallGround[MAX_PLAYERS + 1];
 new bool:g_bOnOffPre[MAX_PLAYERS + 1];
 new bool:g_bJumped[MAX_PLAYERS + 1];
@@ -30,7 +32,7 @@ new Float:g_flFallTime[MAX_PLAYERS + 1];
 new Float:g_flSpeed[MAX_PLAYERS + 1];
 
 public plugin_init() {
-	register_plugin("PreFog", "1.1", "WessTorn"); // Спасибо, FAME, Destroman, Borjomi
+	register_plugin("PreFog", "1.2", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer
 
 	register_clcmd("say /showpre", "cmdShowPre")
 	register_clcmd("say /pre", "cmdShowPre")
@@ -93,9 +95,16 @@ public rgPlayerPreThink(id) {
 
 			if (button & IN_DUCK && ~oldbuttons & IN_DUCK)
 				iOldGroundFrames[id] = iGroundFrames[id];
+
+			if (iGroundFrames[id] == 1) {
+				if (flags & FL_DUCKING)
+					g_bPlrSgs[id] = true;
+				else
+					g_bPlrSgs[id] = false;
+			}
 			
 			if (iGroundFrames[id] <= 5 && button & IN_JUMP && ~oldbuttons & IN_JUMP) {
-				g_iPerfectBhops[id] = false;
+				g_bPerfectBhops[id] = false;
 				switch (iGroundFrames[id]) {
 					case 1: {
 						g_iPreBhopFog[id] = 1;
@@ -115,17 +124,18 @@ public rgPlayerPreThink(id) {
 				}
 
 				if (flSpeed < flMaxPreStrafe && (iGroundFrames[id] == 1 || iGroundFrames[id] >= 2 && flOldSpeed[id] > flMaxPreStrafe))
-					g_iPerfectBhops[id] = true;
+					g_bPerfectBhops[id] = true;
 			}
 
 			if (iGroundFrames[id] <= 5 && button & IN_DUCK && (~oldbuttons & IN_DUCK || (button & IN_DUCK && oldbuttons & IN_DUCK && ~iPrevButtons[id] & IN_DUCK))) {
+				g_bPerfectDucks[id] = false;
 				switch (iGroundFrames[id]) {
 					case 1: {
 						g_iPreDuckFog[id] = 1;
 					}
 					case 2: {
 						g_iPreDuckFog[id] = 2;
-						}
+					}
 					case 3: {
 						g_iPreDuckFog[id] = 3;
 					}
@@ -136,7 +146,17 @@ public rgPlayerPreThink(id) {
 						g_iPreDuckFog[id] = 5;
 					}
 				}
+
+				if (flSpeed < flMaxPreStrafe) {
+					if (g_bPlrSgs[id] == true && iGroundFrames[id] == 2)
+						g_bPerfectDucks[id] = true;
+					else if (g_bPlrSgs[id] == false && iGroundFrames[id] == 1)
+						g_bPerfectDucks[id] = true;
+					else
+						g_bPerfectDucks[id] = false;
+				}
 			}
+
 		} else {
 			if (iGroundFrames[id])
 				iGroundFrames[id] = 0;
@@ -218,7 +238,7 @@ public rgPlayerPreThink(id) {
 								g_flPreBhopSpeed[id] = 0.0;
 							}
 
-							if (g_iPerfectBhops[id] == true) {
+							if (g_bPerfectBhops[id] == true) {
 								if (g_flBhopGainSpeed[id] > g_flSpeed[id]) {
 									set_hudmessage(0, 250, 60, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
 									ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d", g_iPreBhopFog[id], floatround(g_flSpeed[id]));
@@ -264,15 +284,29 @@ public rgPlayerPreThink(id) {
 								g_flDuckGainSpeed[id] = g_flPreDuckSpeed[id];
 								g_flPreDuckSpeed[id] = 0.0;
 							}
-							if (g_flDuckGainSpeed[id] > g_flSpeed[id]) {
-								set_hudmessage(200, 10, 50, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-								ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d(-%d)", g_iPreDuckFog[id], floatround(g_flSpeed[id]), floatround(g_flDuckGainSpeed[id] - g_flSpeed[id]));
-							} else if (g_flDuckGainSpeed[id] == 0.0 || g_flDuckGainSpeed[id] == g_flSpeed[id]) {
-								set_hudmessage(170, 170, 170, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-								ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d", g_iPreDuckFog[id], floatround(g_flSpeed[id]));
-							} else if (g_flDuckGainSpeed[id] < g_flSpeed[id]) {
-								set_hudmessage(0, 250, 60, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-								ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d(+%d)", g_iPreDuckFog[id], floatround(g_flSpeed[id]), floatround(g_flSpeed[id] - g_flDuckGainSpeed[id]));
+
+							if (g_bPerfectDucks[id] == true) {
+								if (g_flDuckGainSpeed[id] > g_flSpeed[id]) {
+									set_hudmessage(0, 250, 60, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
+									ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d", g_iPreDuckFog[id], floatround(g_flSpeed[id]), floatround(g_flDuckGainSpeed[id] - g_flSpeed[id]));
+								} else if (g_flDuckGainSpeed[id] == 0.0 || g_flDuckGainSpeed[id] == g_flSpeed[id]) {
+									set_hudmessage(0, 250, 60, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
+									ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d", g_iPreDuckFog[id], floatround(g_flSpeed[id]));
+								} else if (g_flDuckGainSpeed[id] < g_flSpeed[id]) {
+									set_hudmessage(0, 250, 60, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
+									ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d(+%d)", g_iPreDuckFog[id], floatround(g_flSpeed[id]), floatround(g_flSpeed[id] - g_flDuckGainSpeed[id]));
+								}
+							} else {
+								if (g_flDuckGainSpeed[id] > g_flSpeed[id]) {
+									set_hudmessage(200, 10, 50, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
+									ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d", g_iPreDuckFog[id], floatround(g_flSpeed[id]), floatround(g_flDuckGainSpeed[id] - g_flSpeed[id]));
+								} else if (g_flDuckGainSpeed[id] == 0.0 || g_flDuckGainSpeed[id] == g_flSpeed[id]) {
+									set_hudmessage(200, 10, 50, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
+									ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d", g_iPreDuckFog[id], floatround(g_flSpeed[id]));
+								} else if (g_flDuckGainSpeed[id] < g_flSpeed[id]) {
+									set_hudmessage(200, 10, 50, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
+									ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d(+%d)", g_iPreDuckFog[id], floatround(g_flSpeed[id]), floatround(g_flSpeed[id] - g_flDuckGainSpeed[id]));
+								}
 							}
 						}
 					}
@@ -290,7 +324,9 @@ public rgPlayerPreThink(id) {
 			g_iDDNum[id] = 0;
 			g_iBhopNum[id] = 0;
 			g_bFirstFallGround[id] = false;
-			g_iPerfectBhops[id] = false;
+			g_bPerfectBhops[id] = false;
+			g_bPerfectDucks[id] = false;
+			g_bPlrSgs[id] = false;
 			g_flDuckGainSpeed[id] = 0.0;
 			g_flPreBhopSpeed[id] = 0.0;
 			g_flPreDuckSpeed[id] = 0.0;
@@ -328,7 +364,9 @@ bool:is_user_duck(id) {
 
 public client_connect(id) {
 	g_bOnOffPre[id] = true;
-	g_iPerfectBhops[id] = false;
+	g_bPerfectBhops[id] = false;
+	g_bPerfectDucks[id] = false;
+	g_bPlrSgs[id] = false;
 	g_iDDNum[id] = 0;
 	g_flBhopGainSpeed[id] = 0.0;
 	g_flDuckGainSpeed[id] = 0.0;
