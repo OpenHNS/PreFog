@@ -23,7 +23,7 @@ new Float:g_flFallTime[MAX_PLAYERS + 1];
 new Float:g_flSpeed[MAX_PLAYERS + 1];
 
 public plugin_init() {
-	register_plugin("PreFog", "1.3", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer
+	register_plugin("PreFog", "1.4", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer
 
 	register_clcmd("say /showpre", "cmdShowPre")
 	register_clcmd("say /pre", "cmdShowPre")
@@ -175,8 +175,8 @@ public rgPlayerPreThink(id) {
 			for (i = 1; i <= max_players; i++) {
 				if ((i == id || is_spec_user[i])) {
 					if (g_bOnOffPre[i]) {
-						set_hudmessage(140, 140, 140, -1.0, 0.665, 0, 0.0, 1.0, 0.01, 0.0);
-						ShowSyncHudMsg(i, g_iObject, "%d", floatround(g_flSpeed[id]));
+						set_hudmessage(250, 250, 250, -1.0, 0.65, 0, 0.0, 1.0, 0.01, 0.0);
+						ShowSyncHudMsg(i, g_iObject, "[Ladder]^n%.2f", g_flSpeed[id]);
 					}
 				}
 			}
@@ -192,10 +192,17 @@ public rgPlayerPreThink(id) {
 					if (g_bOnOffPre[i]) {
 						if (g_bPerfectBhops[id] == true) {
 							set_hudmessage(0, 250, 60, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-							ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d", g_iPreBhopFog[id], floatround(g_flSpeed[id]));
+							ShowSyncHudMsg(i, g_iObject, "%d [P]^n%.2f", g_iPreBhopFog[id], g_flSpeed[id]);
 						} else {
-							set_hudmessage(200, 10, 50, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-							ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d", g_iPreBhopFog[id], floatround(g_flSpeed[id]));
+							set_hudmessage(250, 250, 250, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
+							if (g_iPreBhopFog[id] == 2)
+								ShowSyncHudMsg(i, g_iObject, "%d [G]^n%.2f", g_iPreBhopFog[id], g_flSpeed[id]);
+							else if (g_iPreBhopFog[id] == 3)
+								ShowSyncHudMsg(i, g_iObject, "%d [B]^n%.2f", g_iPreBhopFog[id], g_flSpeed[id]);
+							else if (g_iPreBhopFog[id] == 0)
+								ShowSyncHudMsg(i, g_iObject, "[Jump]^n%.2f", g_flSpeed[id]);
+							else
+								ShowSyncHudMsg(i, g_iObject, "%d [VB]^n%.2f", g_iPreBhopFog[id], g_flSpeed[id]);
 						}
 					}
 				}
@@ -210,11 +217,18 @@ public rgPlayerPreThink(id) {
 					if (g_bOnOffPre[i]) {
 						if (g_bPerfectDucks[id] == true) {
 							set_hudmessage(0, 250, 60, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-							ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d", g_iPreDuckFog[id], floatround(g_flSpeed[id]));
+							ShowSyncHudMsg(i, g_iObject, "%d [P]^n%.2f", g_iPreDuckFog[id], g_flSpeed[id]);
 
 						} else {
-							set_hudmessage(200, 10, 50, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-							ShowSyncHudMsg(i, g_iObject, "FOG %d^n%d", g_iPreDuckFog[id], floatround(g_flSpeed[id]));
+							set_hudmessage(250, 250, 250, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
+							if (g_iPreDuckFog[id] == 2 || g_iPreDuckFog[id] == 1)
+								ShowSyncHudMsg(i, g_iObject, "%d [G]^n%.2f", g_iPreDuckFog[id], g_flSpeed[id]);
+							else if (g_iPreDuckFog[id] == 3)
+								ShowSyncHudMsg(i, g_iObject, "%d [B]^n%.2f", g_iPreDuckFog[id], g_flSpeed[id]);
+							else if (g_iPreDuckFog[id] == 0)
+								ShowSyncHudMsg(i, g_iObject, "[Duck]^n%.2f", g_flSpeed[id]);
+							else
+								ShowSyncHudMsg(i, g_iObject, "%d [VB]^n%.2f", g_iPreDuckFog[id], g_flSpeed[id]);
 						}
 					}
 				}
