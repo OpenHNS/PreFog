@@ -1,29 +1,53 @@
 #include <amxmodx>
 #include <reapi>
 
-new g_iPreDuckFog[MAX_PLAYERS + 1];
-new bool:g_bPerfectDucks[MAX_PLAYERS + 1];
-
-new g_iPreBhopFog[MAX_PLAYERS + 1];
-new bool:g_bPerfectBhops[MAX_PLAYERS + 1];
-
-new bool:g_bLadderJump[MAX_PLAYERS + 1];
-
-new g_iMoveType[MAX_PLAYERS + 1];
-new g_iObject;
-new bool:g_bPlrSgs[MAX_PLAYERS + 1];
+new g_iHudObject;
 new bool:g_bOnOffPre[MAX_PLAYERS + 1];
-new Float:g_flSpeed[MAX_PLAYERS + 1];
+
+new g_szFogType[4][] = {
+	"[VB]",
+    "[P]",
+    "[G]",
+    "[B]"
+};
+
+enum E_STATSINFO {
+	m_iFog,
+	m_iFogType,
+	Float:m_flSpeed,
+	Float:m_flOldSpeed,
+	Float:m_flMaxPreStrafe,
+	Float:m_flFallTime,
+	bool:m_bFirstFallGround,
+	bool:m_bShowFirst,
+	bool:m_bLadderJump,
+	bool:m_bSgs
+}
+
+new g_sStatsInfo[MAX_PLAYERS + 1][E_STATSINFO];
+
+enum E_PLAYERINFO {
+	m_iFlags,
+	m_iMoveType,
+	m_iButtons,
+	m_iOldButtons
+}
+
+new g_sPlayerInfo[MAX_PLAYERS + 1][E_PLAYERINFO];
 
 public plugin_init() {
-	register_plugin("PreFog", "1.5", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer
+	register_plugin("PreFog", "2.0.0", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer
 
 	register_clcmd("say /showpre", "cmdShowPre")
 	register_clcmd("say /pre", "cmdShowPre")
 
 	RegisterHookChain(RG_CBasePlayer_PreThink, "rgPlayerPreThink", false);
 
-	g_iObject = CreateHudSyncObj();
+	g_iHudObject = CreateHudSyncObj();
+}
+
+public client_connect(id) {
+	g_bOnOffPre[id] = true;
 }
 
 public cmdShowPre(id) {
@@ -36,141 +60,134 @@ public cmdShowPre(id) {
 }
 
 public rgPlayerPreThink(id) {
-	if (is_user_alive(id) && is_user_connected(id)) {
-		static button, oldbuttons, flags;
-		button = get_entvar(id, var_button);
-		flags = get_entvar(id, var_flags);
-		oldbuttons = get_entvar(id, var_oldbuttons);
+	if (!is_user_connected(id) || !is_user_alive(id) || !g_bOnOffPre[id])
+		return HC_CONTINUE;
+	
+	g_sPlayerInfo[id][m_iButtons] = get_entvar(id, var_button);
+	g_sPlayerInfo[id][m_iOldButtons] = get_entvar(id, var_oldbuttons);
+	g_sPlayerInfo[id][m_iFlags] = get_entvar(id, var_flags);
+	g_sPlayerInfo[id][m_iMoveType] = get_entvar(id, var_movetype);
+	g_sStatsInfo[id][m_flSpeed] = get_speed(id, g_sPlayerInfo[id][m_iFlags]);
+	g_sStatsInfo[id][m_flMaxPreStrafe] = get_maxspeed(id);
 
-		new Float:velocity[3];
-		get_entvar(id, var_velocity, velocity);
-		g_iMoveType[id] = get_entvar(id, var_movetype);
+	new is_spec_user[MAX_PLAYERS + 1];
+	for (new i = 1; i <= MaxClients; i++) {
+		is_spec_user[i] = is_user_spectating_player(i, id);
+	}
 
-		if (flags & FL_ONGROUND && flags & FL_INWATER)
-			velocity[2] = 0.0;
-		if (velocity[2] != 0)
-			velocity[2] -= velocity[2];
+	if (g_sPlayerInfo[id][m_iFlags] & FL_ONGROUND) {
+		if (g_sStatsInfo[id][m_bFirstFallGround] == true && get_gametime() - g_sStatsInfo[id][m_flFallTime] > 0.5) {
+			g_sStatsInfo[id][m_bFirstFallGround] = false;
+			g_sStatsInfo[id][m_bShowFirst] = true;
+		}
 
-		g_flSpeed[id] = vector_length(velocity);
+		if (g_sStatsInfo[id][m_bFirstFallGround] == false) {
+			g_sStatsInfo[id][m_flFallTime] = get_gametime();
+			g_sStatsInfo[id][m_bFirstFallGround] = true;
+		}
 
-		static iGroundFrames[MAX_PLAYERS + 1], Float:flSpeed, Float:flMaxPreStrafe, Pmaxspeed, Float:flOldSpeed[MAX_PLAYERS + 1];
-		flSpeed = vector_length(velocity);
-		Pmaxspeed = get_entvar(id, var_maxspeed);
-		flMaxPreStrafe = Pmaxspeed * 1.2;
-
-		if (flags & FL_ONGROUND) {
-			iGroundFrames[id]++;
-
-			if (iGroundFrames[id] == 1) {
-				g_bPlrSgs[id] = (flags & FL_DUCKING) ? true : false;
+		if (g_sPlayerInfo[id][m_iButtons] & IN_JUMP && !(g_sPlayerInfo[id][m_iOldButtons] & IN_JUMP) && g_sStatsInfo[id][m_bShowFirst]) {
+			for (new i = 1; i <= MaxClients; i++) {
+				if (i == id || is_spec_user[i]) {
+					set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
+					ShowSyncHudMsg(i, g_iHudObject, "[Jump]^n%.2f", g_sStatsInfo[id][m_flSpeed]);
+				}
 			}
+			g_sStatsInfo[id][m_bShowFirst] = false;
+		} else if (g_sPlayerInfo[id][m_iButtons] & IN_DUCK && !(g_sPlayerInfo[id][m_iOldButtons] & IN_DUCK) && g_sStatsInfo[id][m_bShowFirst]) {
+			for (new i = 1; i <= MaxClients; i++) {
+				if (i == id || is_spec_user[i]) {
+					set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
+					ShowSyncHudMsg(i, g_iHudObject, "[Duck]^n%.2f", g_sStatsInfo[id][m_flSpeed]);
+				}
+			}
+			g_sStatsInfo[id][m_bShowFirst] = false;
+		}
 
-			if (iGroundFrames[id] <= 5) {
-				if (button & IN_JUMP && ~oldbuttons & IN_JUMP) {
-					g_bPerfectBhops[id] = false;
-					g_iPreBhopFog[id] = iGroundFrames[id];
+		if (g_sStatsInfo[id][m_iFog] <= 10) {
+			g_sStatsInfo[id][m_iFog]++;
 
-					if (flSpeed < flMaxPreStrafe && (iGroundFrames[id] == 1 || iGroundFrames[id] >= 2 && flOldSpeed[id] > flMaxPreStrafe))
-						g_bPerfectBhops[id] = true;
-				} else if (button & IN_DUCK && ~oldbuttons & IN_DUCK) {
-					g_bPerfectDucks[id] = false;
-					g_iPreDuckFog[id] = iGroundFrames[id];
+			if (g_sStatsInfo[id][m_iFog] == 1) {
+				g_sStatsInfo[id][m_bSgs] = (g_sPlayerInfo[id][m_iFlags] & FL_DUCKING) ? true : false;
+			}
+		}
+	} else {
+		if (g_sStatsInfo[id][m_bFirstFallGround] == true)
+			g_sStatsInfo[id][m_bFirstFallGround] = false;
 
-					if (flSpeed < flMaxPreStrafe) {
-						if (g_bPlrSgs[id] == true && iGroundFrames[id] == 2)
-							g_bPerfectDucks[id] = true;
-						else if (g_bPlrSgs[id] == false && iGroundFrames[id] == 1)
-							g_bPerfectDucks[id] = true;
-						else
-							g_bPerfectDucks[id] = false;
+		if (g_sStatsInfo[id][m_iFog] > 0 && g_sStatsInfo[id][m_iFog] < 10) {
+			g_sStatsInfo[id][m_iFogType] = 0;
+			if (g_sPlayerInfo[id][m_iOldButtons] & IN_JUMP) {
+				if (g_sStatsInfo[id][m_flSpeed] < g_sStatsInfo[id][m_flMaxPreStrafe] && (g_sStatsInfo[id][m_iFog] == 1 || g_sStatsInfo[id][m_iFog] >= 2 && g_sStatsInfo[id][m_flOldSpeed] > g_sStatsInfo[id][m_flMaxPreStrafe]))
+					g_sStatsInfo[id][m_iFogType] = 1;
+
+				if (!g_sStatsInfo[id][m_iFogType]) {
+					if (g_sStatsInfo[id][m_iFog] == 1 || g_sStatsInfo[id][m_iFog] == 2)
+						g_sStatsInfo[id][m_iFogType] = 2;
+					else if (g_sStatsInfo[id][m_iFog] == 3)
+						g_sStatsInfo[id][m_iFogType] = 3;
+					else
+						g_sStatsInfo[id][m_iFogType] = 0;
+				}
+			} else if (g_sPlayerInfo[id][m_iButtons] & IN_DUCK) {
+				if (g_sStatsInfo[id][m_bSgs]) {
+					if (g_sStatsInfo[id][m_iFog] == 3)
+						g_sStatsInfo[id][m_iFogType] = 1;
+					else if (g_sStatsInfo[id][m_iFog] == 4)
+						g_sStatsInfo[id][m_iFogType] = 2;
+					else if (g_sStatsInfo[id][m_iFog] == 5)
+						g_sStatsInfo[id][m_iFogType] = 3;
+					else
+						g_sStatsInfo[id][m_iFogType] = 0;
+				} else {
+					if (g_sStatsInfo[id][m_iFog] == 2)
+						g_sStatsInfo[id][m_iFogType] = 1;
+					else if (g_sStatsInfo[id][m_iFog] == 3)
+						g_sStatsInfo[id][m_iFogType] = 2;
+					else if (g_sStatsInfo[id][m_iFog] == 4)
+						g_sStatsInfo[id][m_iFogType] = 3;
+					else
+						g_sStatsInfo[id][m_iFogType] = 0;
+				}
+			}
+			
+			for (new i = 1; i <= MaxClients; i++) {
+				if (i == id || is_spec_user[i]) {
+					if (g_sStatsInfo[id][m_iFogType] == 1) {
+						set_hudmessage(0, 250, 60, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
+						ShowSyncHudMsg(i, g_iHudObject, "%d %s^n%.2f", g_sStatsInfo[id][m_iFog], g_szFogType[g_sStatsInfo[id][m_iFogType]], g_sStatsInfo[id][m_flSpeed]);
+					} else {
+						set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
+						ShowSyncHudMsg(i, g_iHudObject, "%d %s^n%.2f", g_sStatsInfo[id][m_iFog], g_szFogType[g_sStatsInfo[id][m_iFogType]], g_sStatsInfo[id][m_flSpeed]);
 					}
 				}
 			}
-		} else {
-			if (iGroundFrames[id])
-				iGroundFrames[id] = 0;
 		}
+		g_sStatsInfo[id][m_bSgs] = false
+		g_sStatsInfo[id][m_iFog] = 0;
+	}
 
-		flOldSpeed[id] = flSpeed;
+	g_sStatsInfo[id][m_flOldSpeed] = g_sStatsInfo[id][m_flSpeed];
 
-		new is_spec_user[MAX_PLAYERS + 1];
+	if ((g_sPlayerInfo[id][m_iMoveType] == MOVETYPE_FLY) && (g_sPlayerInfo[id][m_iButtons] & IN_FORWARD || g_sPlayerInfo[id][m_iButtons] & IN_BACK || g_sPlayerInfo[id][m_iButtons] & IN_LEFT || g_sPlayerInfo[id][m_iButtons] & IN_RIGHT)) {
+		g_sStatsInfo[id][m_bLadderJump] = true;
+	}
+
+	if ((g_sPlayerInfo[id][m_iMoveType] == MOVETYPE_FLY) && g_sPlayerInfo[id][m_iButtons] & IN_JUMP) {
+		g_sStatsInfo[id][m_bLadderJump] = false;
+	}
+
+	if (g_sPlayerInfo[id][m_iMoveType] != MOVETYPE_FLY && g_sStatsInfo[id][m_bLadderJump] == true) {
+		g_sStatsInfo[id][m_bLadderJump] = false;
+
 		for (new i = 1; i <= MaxClients; i++) {
-			is_spec_user[i] = is_user_spectating_player(i, id);
-		}
-
-		if ((g_iMoveType[id] == MOVETYPE_FLY) && (button & IN_FORWARD || button & IN_BACK || button & IN_LEFT || button & IN_RIGHT)) {
-			g_bLadderJump[id] = true;
-		}
-
-		if ((g_iMoveType[id] == MOVETYPE_FLY) && button & IN_JUMP) {
-			g_bLadderJump[id] = false;
-		}
-
-		if (g_iMoveType[id] != MOVETYPE_FLY && g_bLadderJump[id] == true) {
-			g_bLadderJump[id] = false;
-
-			static i;
-			for (i = 1; i <= MaxClients; i++) {
-				if (i == id || is_spec_user[i]) {
-					if (g_bOnOffPre[i]) {
-						set_hudmessage(250, 250, 250, -1.0, 0.65, 0, 0.0, 1.0, 0.01, 0.0);
-						ShowSyncHudMsg(i, g_iObject, "[Ladder]^n%.2f", g_flSpeed[id]);
-					}
-				}
-			}
-		}
-
-		if (button & IN_JUMP && !(oldbuttons & IN_JUMP) && flags & FL_ONGROUND) {
-			static i;
-			for (i = 1; i <= MaxClients; i++) {
-				if (i == id || is_spec_user[i]) {
-					if (g_bOnOffPre[i]) {
-						if (g_bPerfectBhops[id] == true) {
-							set_hudmessage(0, 250, 60, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-							ShowSyncHudMsg(i, g_iObject, "%d [P]^n%.2f", g_iPreBhopFog[id], g_flSpeed[id]);
-						} else {
-							set_hudmessage(250, 250, 250, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-							if (g_iPreBhopFog[id] == 2)
-								ShowSyncHudMsg(i, g_iObject, "%d [G]^n%.2f", g_iPreBhopFog[id], g_flSpeed[id]);
-							else if (g_iPreBhopFog[id] == 3)
-								ShowSyncHudMsg(i, g_iObject, "%d [B]^n%.2f", g_iPreBhopFog[id], g_flSpeed[id]);
-							else if (g_iPreBhopFog[id] == 0)
-								ShowSyncHudMsg(i, g_iObject, "[Jump]^n%.2f", g_flSpeed[id]);
-							else
-								ShowSyncHudMsg(i, g_iObject, "%d [VB]^n%.2f", g_iPreBhopFog[id], g_flSpeed[id]);
-						}
-					}
-				}
-			}
-		} else if (button & IN_DUCK && ~oldbuttons & IN_DUCK && flags & FL_ONGROUND) {
-			static i;
-			for (i = 1; i <= MaxClients; i++) {
-				if (i == id || is_spec_user[i]) {
-					if (g_bOnOffPre[i]) {
-						if (g_bPerfectDucks[id] == true) {
-							set_hudmessage(0, 250, 60, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-							ShowSyncHudMsg(i, g_iObject, "%d [P]^n%.2f", g_iPreDuckFog[id], g_flSpeed[id]);
-
-						} else {
-							set_hudmessage(250, 250, 250, -1.0, 0.65, 0, 0.0, 1.0, 0.1, 0.0, 2);
-							if (g_iPreDuckFog[id] == 2 || g_iPreDuckFog[id] == 1)
-								ShowSyncHudMsg(i, g_iObject, "%d [G]^n%.2f", g_iPreDuckFog[id], g_flSpeed[id]);
-							else if (g_iPreDuckFog[id] == 3)
-								ShowSyncHudMsg(i, g_iObject, "%d [B]^n%.2f", g_iPreDuckFog[id], g_flSpeed[id]);
-							else if (g_iPreDuckFog[id] == 0)
-								ShowSyncHudMsg(i, g_iObject, "[Duck]^n%.2f", g_flSpeed[id]);
-							else
-								ShowSyncHudMsg(i, g_iObject, "%d [VB]^n%.2f", g_iPreDuckFog[id], g_flSpeed[id]);
-						}
-					}
-				}
+			if (i == id || is_spec_user[i]) {
+				set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.01, 0.0);
+				ShowSyncHudMsg(i, g_iHudObject, "[Ladder]^n%.2f", g_sStatsInfo[id][m_flSpeed]);
 			}
 		}
 	}
-}
-
-public client_connect(id) {
-	g_bOnOffPre[id] = true;
+	return HC_CONTINUE;
 }
 
 stock is_user_spectating_player(spectator, player) {
@@ -180,14 +197,33 @@ stock is_user_spectating_player(spectator, player) {
 	if(is_user_alive(spectator) || !is_user_alive(player))
 		return 0;
 
-	static specmode;
-	specmode = get_entvar(spectator, var_iuser1);
+	static iSpecMode;
+	iSpecMode = get_entvar(spectator, var_iuser1);
 
-	if(specmode == 3)
+	if(iSpecMode == 3)
 		return 0;
 	   
 	if(get_entvar(spectator, var_iuser2) == player)
 		return 1;
 	   
 	return 0;
+}
+
+stock Float:get_speed(id, iFlags) {
+	static Float:flVelocity[3]; 
+	get_entvar(id, var_velocity, flVelocity);
+
+	if (iFlags & FL_ONGROUND && iFlags & FL_INWATER)
+		flVelocity[2] = 0.0;
+	if (flVelocity[2] != 0)
+		flVelocity[2] -= flVelocity[2];
+
+	return vector_length(flVelocity);
+}
+
+stock Float:get_maxspeed(id) {
+	new iMaxSpeed;
+	iMaxSpeed = get_entvar(id, var_maxspeed);
+	
+	return iMaxSpeed * 1.2;
 }
