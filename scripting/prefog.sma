@@ -1,14 +1,15 @@
 #include <amxmodx>
 #include <reapi>
+#include <fakemeta>
 
 new g_iHudObject;
 new bool:g_bOnOffPre[MAX_PLAYERS + 1];
 
-new g_szFogType[4][] = {
+new g_szFogType[][] = {
 	"[VB]",
-    "[P]",
-    "[G]",
-    "[B]"
+	"[P]",
+	"[G]",
+	"[B]"
 };
 
 enum E_STATSINFO {
@@ -21,8 +22,9 @@ enum E_STATSINFO {
 	bool:m_bFirstFallGround,
 	bool:m_bShowFirst,
 	bool:m_bLadderJump,
-	bool:m_bSgs
-}
+	bool:m_bSgs,
+	bool:m_bIsDuck
+};
 
 new g_sStatsInfo[MAX_PLAYERS + 1][E_STATSINFO];
 
@@ -31,17 +33,17 @@ enum E_PLAYERINFO {
 	m_iMoveType,
 	m_iButtons,
 	m_iOldButtons
-}
+};
 
 new g_sPlayerInfo[MAX_PLAYERS + 1][E_PLAYERINFO];
 
 public plugin_init() {
-	register_plugin("PreFog", "2.0.0", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer
+	register_plugin("PreFog", "2.0.1", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
 
 	register_clcmd("say /showpre", "cmdShowPre")
 	register_clcmd("say /pre", "cmdShowPre")
 
-	RegisterHookChain(RG_CBasePlayer_PreThink, "rgPlayerPreThink", false);
+	RegisterHookChain(RG_CBasePlayer_PreThink, "rgPlayerPreThink");
 
 	g_iHudObject = CreateHudSyncObj();
 }
@@ -60,7 +62,7 @@ public cmdShowPre(id) {
 }
 
 public rgPlayerPreThink(id) {
-	if (!is_user_connected(id) || !is_user_alive(id) || !g_bOnOffPre[id])
+	if (!is_user_alive(id) || !g_bOnOffPre[id])
 		return HC_CONTINUE;
 	
 	g_sPlayerInfo[id][m_iButtons] = get_entvar(id, var_button);
@@ -107,6 +109,10 @@ public rgPlayerPreThink(id) {
 		if (g_sStatsInfo[id][m_iFog] <= 10) {
 			g_sStatsInfo[id][m_iFog]++;
 
+			if (g_sPlayerInfo[id][m_iButtons] & IN_DUCK && !(g_sPlayerInfo[id][m_iOldButtons] & IN_DUCK)) {
+				g_sStatsInfo[id][m_bIsDuck] = true;
+			}
+
 			if (g_sStatsInfo[id][m_iFog] == 1) {
 				g_sStatsInfo[id][m_bSgs] = (g_sPlayerInfo[id][m_iFlags] & FL_DUCKING) ? true : false;
 			}
@@ -115,40 +121,41 @@ public rgPlayerPreThink(id) {
 		if (g_sStatsInfo[id][m_bFirstFallGround] == true)
 			g_sStatsInfo[id][m_bFirstFallGround] = false;
 
+		if (isUserSurfing(id)) {
+			g_sStatsInfo[id][m_iFog] = 0;
+		}
+
 		if (g_sStatsInfo[id][m_iFog] > 0 && g_sStatsInfo[id][m_iFog] < 10) {
 			g_sStatsInfo[id][m_iFogType] = 0;
+			
 			if (g_sPlayerInfo[id][m_iOldButtons] & IN_JUMP) {
 				if (g_sStatsInfo[id][m_flSpeed] < g_sStatsInfo[id][m_flMaxPreStrafe] && (g_sStatsInfo[id][m_iFog] == 1 || g_sStatsInfo[id][m_iFog] >= 2 && g_sStatsInfo[id][m_flOldSpeed] > g_sStatsInfo[id][m_flMaxPreStrafe]))
 					g_sStatsInfo[id][m_iFogType] = 1;
 
 				if (!g_sStatsInfo[id][m_iFogType]) {
-					if (g_sStatsInfo[id][m_iFog] == 1 || g_sStatsInfo[id][m_iFog] == 2)
-						g_sStatsInfo[id][m_iFogType] = 2;
-					else if (g_sStatsInfo[id][m_iFog] == 3)
-						g_sStatsInfo[id][m_iFogType] = 3;
-					else
-						g_sStatsInfo[id][m_iFogType] = 0;
+					switch(g_sStatsInfo[id][m_iFog]) {
+						case 1..2: g_sStatsInfo[id][m_iFogType] = 2;
+						case 3: g_sStatsInfo[id][m_iFogType] = 3;
+						default: g_sStatsInfo[id][m_iFogType] = 0;
+					}
 				}
-			} else if (g_sPlayerInfo[id][m_iButtons] & IN_DUCK) {
+			} else if (g_sStatsInfo[id][m_bIsDuck]) {
 				if (g_sStatsInfo[id][m_bSgs]) {
-					if (g_sStatsInfo[id][m_iFog] == 3)
-						g_sStatsInfo[id][m_iFogType] = 1;
-					else if (g_sStatsInfo[id][m_iFog] == 4)
-						g_sStatsInfo[id][m_iFogType] = 2;
-					else if (g_sStatsInfo[id][m_iFog] == 5)
-						g_sStatsInfo[id][m_iFogType] = 3;
-					else
-						g_sStatsInfo[id][m_iFogType] = 0;
+					switch(g_sStatsInfo[id][m_iFog]) {
+						case 3: g_sStatsInfo[id][m_iFogType] = 1;
+						case 4: g_sStatsInfo[id][m_iFogType] = 2;
+						case 5: g_sStatsInfo[id][m_iFogType] = 3;
+						default: g_sStatsInfo[id][m_iFogType] = 0;
+					}
 				} else {
-					if (g_sStatsInfo[id][m_iFog] == 2)
-						g_sStatsInfo[id][m_iFogType] = 1;
-					else if (g_sStatsInfo[id][m_iFog] == 3)
-						g_sStatsInfo[id][m_iFogType] = 2;
-					else if (g_sStatsInfo[id][m_iFog] == 4)
-						g_sStatsInfo[id][m_iFogType] = 3;
-					else
-						g_sStatsInfo[id][m_iFogType] = 0;
+					switch(g_sStatsInfo[id][m_iFog]) {
+						case 2: g_sStatsInfo[id][m_iFogType] = 1;
+						case 3: g_sStatsInfo[id][m_iFogType] = 2;
+						case 4: g_sStatsInfo[id][m_iFogType] = 3;
+						default: g_sStatsInfo[id][m_iFogType] = 0;
+					}
 				}
+				g_sStatsInfo[id][m_bIsDuck] = false;
 			}
 			
 			for (new i = 1; i <= MaxClients; i++) {
@@ -162,6 +169,7 @@ public rgPlayerPreThink(id) {
 					}
 				}
 			}
+			g_sStatsInfo[id][m_bIsDuck] = false;
 		}
 		g_sStatsInfo[id][m_bSgs] = false
 		g_sStatsInfo[id][m_iFog] = 0;
@@ -191,9 +199,6 @@ public rgPlayerPreThink(id) {
 }
 
 stock is_user_spectating_player(spectator, player) {
-	if(!is_user_connected(spectator) || !is_user_connected(player))
-		return 0;
-
 	if(is_user_alive(spectator) || !is_user_alive(player))
 		return 0;
 
@@ -202,15 +207,15 @@ stock is_user_spectating_player(spectator, player) {
 
 	if(iSpecMode == 3)
 		return 0;
-	   
+	  
 	if(get_entvar(spectator, var_iuser2) == player)
 		return 1;
-	   
+	  
 	return 0;
 }
 
 stock Float:get_speed(id, iFlags) {
-	static Float:flVelocity[3]; 
+	static Float:flVelocity[3];
 	get_entvar(id, var_velocity, flVelocity);
 
 	if (iFlags & FL_ONGROUND && iFlags & FL_INWATER)
@@ -227,3 +232,25 @@ stock Float:get_maxspeed(id) {
 	
 	return iMaxSpeed * 1.2;
 }
+
+stock bool:isUserSurfing(id) {
+	static Float:origin[3], Float:dest[3];
+	get_entvar(id, var_origin, origin);
+	
+	dest[0] = origin[0];
+	dest[1] = origin[1];
+	dest[2] = origin[2] - 1.0;
+
+	static Float:flFraction;
+
+	engfunc(EngFunc_TraceHull, origin, dest, 0, 
+		g_sPlayerInfo[id][m_iFlags] & FL_DUCKING ? HULL_HEAD : HULL_HUMAN, id, 0);
+
+	get_tr2(0, TR_flFraction, flFraction);
+
+	if (flFraction >= 1.0) return false;
+	
+	get_tr2(0, TR_vecPlaneNormal, dest);
+
+	return dest[2] <= 0.7;
+} 
