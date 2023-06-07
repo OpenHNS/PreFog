@@ -21,9 +21,10 @@ enum E_STATSINFO {
 	Float:m_flFallTime,
 	bool:m_bFirstFallGround,
 	bool:m_bShowFirst,
-	bool:m_bLadderJump,
 	bool:m_bSgs,
-	bool:m_bIsDuck
+	bool:m_bIsDuck,
+	bool:m_bLadderProtect,
+	bool:m_bSlideProtect
 };
 
 new g_sStatsInfo[MAX_PLAYERS + 1][E_STATSINFO];
@@ -38,7 +39,7 @@ enum E_PLAYERINFO {
 new g_sPlayerInfo[MAX_PLAYERS + 1][E_PLAYERINFO];
 
 public plugin_init() {
-	register_plugin("PreFog", "2.0.1", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
+	register_plugin("PreFog", "2.0.2", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
 
 	register_clcmd("say /showpre", "cmdShowPre")
 	register_clcmd("say /pre", "cmdShowPre")
@@ -123,6 +124,31 @@ public rgPlayerPreThink(id) {
 
 		if (isUserSurfing(id)) {
 			g_sStatsInfo[id][m_iFog] = 0;
+			g_sStatsInfo[id][m_bSlideProtect] = true;
+		} else {
+			if (g_sStatsInfo[id][m_bSlideProtect]) {
+				for (new i = 1; i <= MaxClients; i++) {
+					if (i == id || is_spec_user[i]) {
+						set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.01, 0.0);
+						ShowSyncHudMsg(i, g_iHudObject, "[Slide]^n%.2f", g_sStatsInfo[id][m_flSpeed]);
+					}
+				}
+			}
+			g_sStatsInfo[id][m_bSlideProtect] = false;
+		}
+
+		if (g_sPlayerInfo[id][m_iMoveType] == MOVETYPE_FLY) {
+			g_sStatsInfo[id][m_bLadderProtect] = true;
+		} else {
+			if (g_sStatsInfo[id][m_bLadderProtect]) {
+				for (new i = 1; i <= MaxClients; i++) {
+					if (i == id || is_spec_user[i]) {
+						set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.01, 0.0);
+						ShowSyncHudMsg(i, g_iHudObject, "[Ladder]^n%.2f", g_sStatsInfo[id][m_flSpeed]);
+					}
+				}
+			}
+			g_sStatsInfo[id][m_bLadderProtect] = false;
 		}
 
 		if (g_sStatsInfo[id][m_iFog] > 0 && g_sStatsInfo[id][m_iFog] < 10) {
@@ -177,24 +203,6 @@ public rgPlayerPreThink(id) {
 
 	g_sStatsInfo[id][m_flOldSpeed] = g_sStatsInfo[id][m_flSpeed];
 
-	if ((g_sPlayerInfo[id][m_iMoveType] == MOVETYPE_FLY) && (g_sPlayerInfo[id][m_iButtons] & IN_FORWARD || g_sPlayerInfo[id][m_iButtons] & IN_BACK || g_sPlayerInfo[id][m_iButtons] & IN_LEFT || g_sPlayerInfo[id][m_iButtons] & IN_RIGHT)) {
-		g_sStatsInfo[id][m_bLadderJump] = true;
-	}
-
-	if ((g_sPlayerInfo[id][m_iMoveType] == MOVETYPE_FLY) && g_sPlayerInfo[id][m_iButtons] & IN_JUMP) {
-		g_sStatsInfo[id][m_bLadderJump] = false;
-	}
-
-	if (g_sPlayerInfo[id][m_iMoveType] != MOVETYPE_FLY && g_sStatsInfo[id][m_bLadderJump] == true) {
-		g_sStatsInfo[id][m_bLadderJump] = false;
-
-		for (new i = 1; i <= MaxClients; i++) {
-			if (i == id || is_spec_user[i]) {
-				set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.01, 0.0);
-				ShowSyncHudMsg(i, g_iHudObject, "[Ladder]^n%.2f", g_sStatsInfo[id][m_flSpeed]);
-			}
-		}
-	}
 	return HC_CONTINUE;
 }
 
