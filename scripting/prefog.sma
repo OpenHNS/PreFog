@@ -16,6 +16,7 @@ enum E_STATSINFO {
 	m_iFog,
 	m_iFogType,
 	Float:m_flSpeed,
+	Float:m_flPreSpeed,
 	Float:m_flOldSpeed,
 	Float:m_flMaxPreStrafe,
 	Float:m_flFallTime,
@@ -31,6 +32,7 @@ new g_sStatsInfo[MAX_PLAYERS + 1][E_STATSINFO];
 
 enum E_PLAYERINFO {
 	m_iFlags,
+	m_iOldFlags,
 	m_iMoveType,
 	m_iButtons,
 	m_iOldButtons
@@ -39,7 +41,7 @@ enum E_PLAYERINFO {
 new g_sPlayerInfo[MAX_PLAYERS + 1][E_PLAYERINFO];
 
 public plugin_init() {
-	register_plugin("PreFog", "2.0.2", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
+	register_plugin("PreFog", "2.0.3", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
 
 	register_clcmd("say /showpre", "cmdShowPre")
 	register_clcmd("say /pre", "cmdShowPre")
@@ -70,8 +72,8 @@ public rgPlayerPreThink(id) {
 	g_sPlayerInfo[id][m_iOldButtons] = get_entvar(id, var_oldbuttons);
 	g_sPlayerInfo[id][m_iFlags] = get_entvar(id, var_flags);
 	g_sPlayerInfo[id][m_iMoveType] = get_entvar(id, var_movetype);
-	g_sStatsInfo[id][m_flSpeed] = get_speed(id, g_sPlayerInfo[id][m_iFlags]);
 	g_sStatsInfo[id][m_flMaxPreStrafe] = get_maxspeed(id);
+	g_sStatsInfo[id][m_flSpeed] = get_speed(id);
 
 	new is_spec_user[MAX_PLAYERS + 1];
 	for (new i = 1; i <= MaxClients; i++) {
@@ -79,6 +81,11 @@ public rgPlayerPreThink(id) {
 	}
 
 	if (g_sPlayerInfo[id][m_iFlags] & FL_ONGROUND) {
+		if (!(g_sPlayerInfo[id][m_iOldFlags] & FL_ONGROUND)) {
+			g_sStatsInfo[id][m_flPreSpeed] = g_sStatsInfo[id][m_flSpeed];
+		}
+
+
 		if (g_sStatsInfo[id][m_bFirstFallGround] == true && get_gametime() - g_sStatsInfo[id][m_flFallTime] > 0.5) {
 			g_sStatsInfo[id][m_bFirstFallGround] = false;
 			g_sStatsInfo[id][m_bShowFirst] = true;
@@ -188,10 +195,10 @@ public rgPlayerPreThink(id) {
 				if (i == id || is_spec_user[i]) {
 					if (g_sStatsInfo[id][m_iFogType] == 1) {
 						set_hudmessage(0, 250, 60, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
-						ShowSyncHudMsg(i, g_iHudObject, "%d %s^n%.2f", g_sStatsInfo[id][m_iFog], g_szFogType[g_sStatsInfo[id][m_iFogType]], g_sStatsInfo[id][m_flSpeed]);
+						ShowSyncHudMsg(i, g_iHudObject, "%d %s^n%.2f^n%.2f", g_sStatsInfo[id][m_iFog], g_szFogType[g_sStatsInfo[id][m_iFogType]], g_sStatsInfo[id][m_flPreSpeed], g_sStatsInfo[id][m_flOldSpeed]);
 					} else {
 						set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
-						ShowSyncHudMsg(i, g_iHudObject, "%d %s^n%.2f", g_sStatsInfo[id][m_iFog], g_szFogType[g_sStatsInfo[id][m_iFogType]], g_sStatsInfo[id][m_flSpeed]);
+						ShowSyncHudMsg(i, g_iHudObject, "%d %s^n%.2f^n%.2f", g_sStatsInfo[id][m_iFog], g_szFogType[g_sStatsInfo[id][m_iFogType]],g_sStatsInfo[id][m_flPreSpeed], g_sStatsInfo[id][m_flOldSpeed]);
 					}
 				}
 			}
@@ -201,6 +208,7 @@ public rgPlayerPreThink(id) {
 		g_sStatsInfo[id][m_iFog] = 0;
 	}
 
+	g_sPlayerInfo[id][m_iOldFlags] = g_sPlayerInfo[id][m_iFlags]
 	g_sStatsInfo[id][m_flOldSpeed] = g_sStatsInfo[id][m_flSpeed];
 
 	return HC_CONTINUE;
@@ -222,23 +230,23 @@ stock is_user_spectating_player(spectator, player) {
 	return 0;
 }
 
-stock Float:get_speed(id, iFlags) {
+stock Float:get_speed(id) {
 	static Float:flVelocity[3];
 	get_entvar(id, var_velocity, flVelocity);
 
-	if (iFlags & FL_ONGROUND && iFlags & FL_INWATER)
-		flVelocity[2] = 0.0;
-	if (flVelocity[2] != 0)
-		flVelocity[2] -= flVelocity[2];
+	new Float:flNorma = floatpower(flVelocity[0], 2.0) + floatpower(flVelocity[1], 2.0)
 
-	return vector_length(flVelocity);
+	if (flNorma > 0.0)
+		return floatsqroot(flNorma);
+
+	return 0.0
 }
 
 stock Float:get_maxspeed(id) {
-	new iMaxSpeed;
-	iMaxSpeed = get_entvar(id, var_maxspeed);
+	new Float:flMaxSpeed;
+	flMaxSpeed = get_entvar(id, var_maxspeed);
 	
-	return iMaxSpeed * 1.2;
+	return flMaxSpeed * 1.2;
 }
 
 stock bool:isUserSurfing(id) {
