@@ -40,8 +40,10 @@ enum E_PLAYERINFO {
 
 new g_sPlayerInfo[MAX_PLAYERS + 1][E_PLAYERINFO];
 
+new bool:g_isSpec[MAX_PLAYERS + 1];
+
 public plugin_init() {
-	register_plugin("PreFog", "2.0.3", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
+	register_plugin("PreFog", "2.0.4", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
 
 	register_clcmd("say /showpre", "cmdShowPre")
 	register_clcmd("say /pre", "cmdShowPre")
@@ -65,8 +67,18 @@ public cmdShowPre(id) {
 }
 
 public rgPlayerPreThink(id) {
-	if (!is_user_alive(id) || !g_bOnOffPre[id])
+	if (!g_bOnOffPre[id])
 		return HC_CONTINUE;
+
+	if (!is_user_alive(id)) {
+		if(get_member(id, m_iObserverLastMode) == OBS_ROAMING)
+			return HC_CONTINUE;
+
+		g_isSpec[id] = true;
+		return HC_CONTINUE;
+	} else {
+		g_isSpec[id] = false;
+	}
 	
 	g_sPlayerInfo[id][m_iButtons] = get_entvar(id, var_button);
 	g_sPlayerInfo[id][m_iOldButtons] = get_entvar(id, var_oldbuttons);
@@ -74,11 +86,6 @@ public rgPlayerPreThink(id) {
 	g_sPlayerInfo[id][m_iMoveType] = get_entvar(id, var_movetype);
 	g_sStatsInfo[id][m_flMaxPreStrafe] = get_maxspeed(id);
 	g_sStatsInfo[id][m_flSpeed] = get_speed(id);
-
-	new is_spec_user[MAX_PLAYERS + 1];
-	for (new i = 1; i <= MaxClients; i++) {
-		is_spec_user[i] = is_user_spectating_player(i, id);
-	}
 
 	if (g_sPlayerInfo[id][m_iFlags] & FL_ONGROUND) {
 		if (!(g_sPlayerInfo[id][m_iOldFlags] & FL_ONGROUND)) {
@@ -98,7 +105,7 @@ public rgPlayerPreThink(id) {
 
 		if (g_sPlayerInfo[id][m_iButtons] & IN_JUMP && !(g_sPlayerInfo[id][m_iOldButtons] & IN_JUMP) && g_sStatsInfo[id][m_bShowFirst]) {
 			for (new i = 1; i <= MaxClients; i++) {
-				if (i == id || is_spec_user[i]) {
+				if (i == id || g_isSpec[i]) {
 					set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
 					ShowSyncHudMsg(i, g_iHudObject, "[Jump]^n%.2f", g_sStatsInfo[id][m_flSpeed]);
 				}
@@ -106,7 +113,7 @@ public rgPlayerPreThink(id) {
 			g_sStatsInfo[id][m_bShowFirst] = false;
 		} else if (g_sPlayerInfo[id][m_iButtons] & IN_DUCK && !(g_sPlayerInfo[id][m_iOldButtons] & IN_DUCK) && g_sStatsInfo[id][m_bShowFirst]) {
 			for (new i = 1; i <= MaxClients; i++) {
-				if (i == id || is_spec_user[i]) {
+				if (i == id || g_isSpec[i]) {
 					set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
 					ShowSyncHudMsg(i, g_iHudObject, "[Duck]^n%.2f", g_sStatsInfo[id][m_flSpeed]);
 				}
@@ -135,7 +142,7 @@ public rgPlayerPreThink(id) {
 		} else {
 			if (g_sStatsInfo[id][m_bSlideProtect]) {
 				for (new i = 1; i <= MaxClients; i++) {
-					if (i == id || is_spec_user[i]) {
+					if (i == id || g_isSpec[i]) {
 						set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.01, 0.0);
 						ShowSyncHudMsg(i, g_iHudObject, "[Slide]^n%.2f", g_sStatsInfo[id][m_flSpeed]);
 					}
@@ -149,7 +156,7 @@ public rgPlayerPreThink(id) {
 		} else {
 			if (g_sStatsInfo[id][m_bLadderProtect]) {
 				for (new i = 1; i <= MaxClients; i++) {
-					if (i == id || is_spec_user[i]) {
+					if (i == id || g_isSpec[i]) {
 						set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.01, 0.0);
 						ShowSyncHudMsg(i, g_iHudObject, "[Ladder]^n%.2f", g_sStatsInfo[id][m_flSpeed]);
 					}
@@ -192,7 +199,7 @@ public rgPlayerPreThink(id) {
 			}
 			
 			for (new i = 1; i <= MaxClients; i++) {
-				if (i == id || is_spec_user[i]) {
+				if (i == id || g_isSpec[i]) {
 					if (g_sStatsInfo[id][m_iFogType] == 1) {
 						set_hudmessage(0, 250, 60, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
 						ShowSyncHudMsg(i, g_iHudObject, "%d %s^n%.2f^n%.2f", g_sStatsInfo[id][m_iFog], g_szFogType[g_sStatsInfo[id][m_iFogType]], g_sStatsInfo[id][m_flPreSpeed], g_sStatsInfo[id][m_flOldSpeed]);
@@ -212,22 +219,6 @@ public rgPlayerPreThink(id) {
 	g_sStatsInfo[id][m_flOldSpeed] = g_sStatsInfo[id][m_flSpeed];
 
 	return HC_CONTINUE;
-}
-
-stock is_user_spectating_player(spectator, player) {
-	if(is_user_alive(spectator) || !is_user_alive(player))
-		return 0;
-
-	static iSpecMode;
-	iSpecMode = get_entvar(spectator, var_iuser1);
-
-	if(iSpecMode == 3)
-		return 0;
-	  
-	if(get_entvar(spectator, var_iuser2) == player)
-		return 1;
-	  
-	return 0;
 }
 
 stock Float:get_speed(id) {
