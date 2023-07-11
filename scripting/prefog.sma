@@ -4,13 +4,30 @@
 
 new g_iHudObject;
 new bool:g_bOnOffPre[MAX_PLAYERS + 1];
+new bool:g_bOnOffSpeed[MAX_PLAYERS + 1];
+
+enum PRE_TYPE {
+	PRE_FOG = 0,
+	PRE_JUMP,
+	PRE_DUCK,
+	PRE_LADDER,
+	PRE_SLIDE
+};
+
+new g_szPreType[PRE_TYPE][] = {
+	"",
+	"[Jump]",
+	"[Duck]",
+	"[Ladder]",
+	"[Slide]"
+};
 
 enum FOG_TYPE {
 	FOG_VERYBAD = 0,
 	FOG_PERFECT,
 	FOG_GOOD,
 	FOG_BAD
-}
+};
 
 new g_szFogType[FOG_TYPE][] = {
 	"[VB]",
@@ -19,17 +36,29 @@ new g_szFogType[FOG_TYPE][] = {
 	"[B]"
 };
 
-new FOG_TYPE:g_eFogType[MAX_PLAYERS + 1];
+enum _:HUD_PRE {
+	HUD_FOG,
+	FOG_TYPE:HUD_FOGTYPE,
+	Float:HUD_PREST,
+	Float:HUD_POST,
+	PRE_TYPE:HUD_TYPE
+};
+
+new g_eHudPre[MAX_PLAYERS + 1][HUD_PRE];
+
+new bool:g_isPre[MAX_PLAYERS + 1];
 
 new g_bInDuck[MAX_PLAYERS + 1];
 
 new bool:g_isSpec[MAX_PLAYERS + 1];
 
 public plugin_init() {
-	register_plugin("PreFog", "2.1.0", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
+	register_plugin("PreFog", "3.0.0", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
 
 	register_clcmd("say /showpre", "cmdShowPre")
 	register_clcmd("say /pre", "cmdShowPre")
+	register_clcmd("say /showspeed", "cmdShowSpeed")
+	register_clcmd("say /speed", "cmdShowSpeed")
 
 	RegisterHookChain(RG_PM_Move, "rgPM_Move");
 
@@ -38,6 +67,8 @@ public plugin_init() {
 
 public client_connect(id) {
 	g_bOnOffPre[id] = true;
+	g_bOnOffSpeed[id] = true;
+	arrayset(g_eHudPre[id], 0, HUD_PRE);
 }
 
 public cmdShowPre(id) {
@@ -48,6 +79,16 @@ public cmdShowPre(id) {
 	else
 		client_print_color(id, print_team_blue, "[^3PreFog^1] Show Fog/Prestrafe: ^3ON^1");
 }
+
+public cmdShowSpeed(id) {
+	g_bOnOffSpeed[id] = g_bOnOffSpeed[id] ? false : true;
+
+	if (!g_bOnOffSpeed[id])
+		client_print_color(id, print_team_blue, "[^3PreFog^1] Show Speed: ^3OFF^1");
+	else
+		client_print_color(id, print_team_blue, "[^3PreFog^1] Show Speed: ^3ON^1");
+}
+
 
 public rgPM_Move(id) {
 	if (!g_bOnOffPre[id])
@@ -82,6 +123,9 @@ public rgPM_Move(id) {
 	g_bInDuck[id] = bool:(get_pmove(pm_flags) & FL_DUCKING);
 	static isSgs;
 
+	if (g_bOnOffSpeed[id] || g_bOnOffPre[id])
+		show_prespeed(id, flSpeed);
+
 	if (isGround) {
 		iFog++;
 
@@ -98,12 +142,7 @@ public rgPM_Move(id) {
 			isSlide = true;
 		} else {
 			if (isSlide) {
-				for (new i = 1; i <= MaxClients; i++) {
-					if (i == id || g_isSpec[i]) {
-						set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.01, 0.0);
-						ShowSyncHudMsg(i, g_iHudObject, "[Slide]^n%.2f", flSpeed);
-					}
-				}
+				format_prest(id, PRE_SLIDE, flOldSpeed);
 				isSlide = false;
 			}
 		}
@@ -113,73 +152,48 @@ public rgPM_Move(id) {
 			new bool:isJump = !isDuck && iOldButtons & IN_JUMP && !(iPrevButtons & IN_JUMP);
 
 			if (isOldLadder) {
-				for (new i = 1; i <= MaxClients; i++) {
-					if (i == id || g_isSpec[i]) {
-						set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.01, 0.0);
-						ShowSyncHudMsg(i, g_iHudObject, "[Ladder]^n%.2f", flSpeed);
-					}
-				}
+				format_prest(id, PRE_LADDER, flOldSpeed);
 			} else {
 				if (iFog > 10) {
 					if (isDuck) {
-						for (new i = 1; i <= MaxClients; i++) {
-							if (i == id || g_isSpec[i]) {
-								set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
-								ShowSyncHudMsg(i, g_iHudObject, "[Duck]^n%.2f", flSpeed);
-							}
-						}
+						format_prest(id, PRE_DUCK, flOldSpeed);
 					} 
 					if (isJump) {
-						for (new i = 1; i <= MaxClients; i++) {
-							if (i == id || g_isSpec[i]) {
-								set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
-								ShowSyncHudMsg(i, g_iHudObject, "[Jump]^n%.2f", flSpeed);
-							}
-						}
+						format_prest(id, PRE_JUMP, flOldSpeed);
 					}
 				} else {
-					g_eFogType[id] = FOG_VERYBAD;
+					new FOG_TYPE:iFogType;
 					
 					if (isJump) {
 						if (flSpeed < flMaxSpeed && iFog == 1)
-							g_eFogType[id] = FOG_PERFECT;
+							iFogType = FOG_PERFECT;
 
-						if (!g_eFogType[id]) {
+						if (!iFogType) {
 							switch(iFog) {
-								case 1..2: g_eFogType[id] = FOG_GOOD;
-								case 3: g_eFogType[id] = FOG_BAD;
-								default: g_eFogType[id] = FOG_VERYBAD;
+								case 1..2: iFogType = FOG_GOOD;
+								case 3: iFogType = FOG_BAD;
+								default: iFogType = FOG_VERYBAD;
 							}
 						}
 					} else if (isDuck) {
 						if (isSgs) {
 							switch(iFog) {
-								case 3: g_eFogType[id] = FOG_PERFECT;
-								case 4: g_eFogType[id] = FOG_GOOD;
-								case 5: g_eFogType[id] = FOG_BAD;
-								default: g_eFogType[id] = FOG_VERYBAD;
+								case 3: iFogType = FOG_PERFECT;
+								case 4: iFogType = FOG_GOOD;
+								case 5: iFogType = FOG_BAD;
+								default: iFogType = FOG_VERYBAD;
 							}
 						} else {
 							switch(iFog) {
-								case 2: g_eFogType[id] = FOG_PERFECT;
-								case 3: g_eFogType[id] = FOG_GOOD;
-								case 4: g_eFogType[id] = FOG_BAD;
-								default: g_eFogType[id] = FOG_VERYBAD;
+								case 2: iFogType = FOG_PERFECT;
+								case 3: iFogType = FOG_GOOD;
+								case 4: iFogType = FOG_BAD;
+								default: iFogType = FOG_VERYBAD;
 							}
 						}
 					}
 					
-					for (new i = 1; i <= MaxClients; i++) {
-						if (i == id || g_isSpec[i]) {
-							if (g_eFogType[id] == FOG_PERFECT) {
-								set_hudmessage(0, 250, 60, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
-								ShowSyncHudMsg(i, g_iHudObject, "%d %s^n%.2f^n%.2f", iFog, g_szFogType[g_eFogType[id]], flPreSpeed, flOldSpeed);
-							} else {
-								set_hudmessage(250, 250, 250, -1.0, 0.64, 0, 0.0, 1.0, 0.1, 0.0, 2);
-								ShowSyncHudMsg(i, g_iHudObject, "%d %s^n%.2f^n%.2f", iFog, g_szFogType[g_eFogType[id]],flPreSpeed, flOldSpeed);
-							}
-						}
-					}
+					format_prest(id, PRE_FOG, flOldSpeed, flPreSpeed, iFog, iFogType);
 				}
 			}
 		}
@@ -195,6 +209,74 @@ public rgPM_Move(id) {
 
 	return HC_CONTINUE;
 }
+
+stock format_prest(id, PRE_TYPE:iPreType, Float:flPost, Float:flPre = 0.0, iFog = 0, FOG_TYPE:iType = FOG_VERYBAD) {
+	g_isPre[id] = true;
+	g_eHudPre[id][HUD_TYPE] = iPreType;
+	g_eHudPre[id][HUD_POST] = flPost;
+	g_eHudPre[id][HUD_PREST] = flPre;
+	g_eHudPre[id][HUD_FOG] = iFog;
+	g_eHudPre[id][HUD_FOGTYPE] = iType;
+}
+
+public show_prespeed(id, Float:flSpeed) {
+	new Float:g_flGameTime = get_gametime();
+	static Float:flHudTime
+	
+	if(flHudTime + 0.05 > g_flGameTime)
+		return;
+
+	static bool:isPre;
+	static Float:flPreTime;
+
+	if (!isPre) {
+		isPre = g_isPre[id];
+		if (isPre) {
+			flPreTime = g_flGameTime + 1.0;
+			g_isPre[id] = false;
+		}
+	} else {
+		if (g_isPre[id]) {
+			flPreTime = g_flGameTime + 1.0;
+			g_isPre[id] = false;
+		}
+	}
+
+	if(flPreTime < g_flGameTime) {
+		isPre = false;
+		arrayset(g_eHudPre[id], 0, HUD_PRE);
+	}
+
+	for (new i = 1; i <= MaxClients; i++) {
+		if (i == id || g_isSpec[i]) {
+			if (g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT)
+				set_hudmessage(0, 250, 60, -1.0, 0.55, 0, 0.0, 1.0, 0.1, 0.0, 1);
+			else
+				set_hudmessage(250, 250, 250, -1.0, 0.55, 0, 1.0, 0.15, 0.0, 0.0, 1);
+
+
+			new szSpeed[8];
+			if (g_bOnOffSpeed[id])
+				formatex(szSpeed, charsmax(szSpeed), "%.0f u/s", flSpeed)
+
+			if (g_bOnOffPre[id] && isPre) {
+				switch (g_eHudPre[id][HUD_TYPE]) {
+					case HUD_FOG: {
+						ShowSyncHudMsg(id, g_iHudObject, "%s^n^n%d %s^n%.2f^n%.2f", g_bOnOffSpeed[id] ? szSpeed : "", g_eHudPre[id][HUD_FOG], g_szFogType[g_eHudPre[id][HUD_FOGTYPE]], g_eHudPre[id][HUD_PREST], g_eHudPre[id][HUD_POST]);
+					}
+					default: {
+						ShowSyncHudMsg(id, g_iHudObject, "%s^n^n%s^n%.2f", g_bOnOffSpeed[id] ? szSpeed : "", g_szPreType[g_eHudPre[id][HUD_TYPE]], g_eHudPre[HUD_POST]);
+					}
+				}
+			} else { 
+				ShowSyncHudMsg(id, g_iHudObject, "%s", g_bOnOffSpeed[id] ? szSpeed : "");
+			}
+		}
+	}
+
+	flHudTime = g_flGameTime;
+}
+
 
 stock Float:vector_hor_length(Float:flVel[3]) {
 	new Float:flNorma = floatpower(flVel[0], 2.0) + floatpower(flVel[1], 2.0);
