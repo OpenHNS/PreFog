@@ -52,13 +52,37 @@ new g_bInDuck[MAX_PLAYERS + 1];
 
 new bool:g_isSpec[MAX_PLAYERS + 1];
 
-public plugin_init() {
-	register_plugin("PreFog", "3.0.0", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
+enum PRE_CVAR {
+	c_iPreHudDefPerfR,
+	c_iPreHudDefPerfG,
+	c_iPreHudDefPerfB,
+	c_iPreHudDefR,
+	c_iPreHudDefG,
+	c_iPreHudDefB,
+	Float:c_iPreHudX,
+	Float:c_iPreHudY,
+	c_iPreHud,
+}
 
-	register_clcmd("say /showpre", "cmdShowPre")
-	register_clcmd("say /pre", "cmdShowPre")
-	register_clcmd("say /showspeed", "cmdShowSpeed")
-	register_clcmd("say /speed", "cmdShowSpeed")
+new g_pCvar[PRE_CVAR];
+
+public plugin_init() {
+	register_plugin("PreFog", "3.1.0", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
+
+	bind_pcvar_num(register_cvar("pre_def_pref_R", "0"),	g_pCvar[c_iPreHudDefPerfR]);
+	bind_pcvar_num(register_cvar("pre_def_pref_G", "250"),	g_pCvar[c_iPreHudDefPerfG]);
+	bind_pcvar_num(register_cvar("pre_def_pref_B", "60"),	g_pCvar[c_iPreHudDefPerfB]);
+	bind_pcvar_num(register_cvar("pre_def_R", "250"),		g_pCvar[c_iPreHudDefR]);
+	bind_pcvar_num(register_cvar("pre_def_G", "250"),		g_pCvar[c_iPreHudDefG]);
+	bind_pcvar_num(register_cvar("pre_def_B", "250"),		g_pCvar[c_iPreHudDefB]);
+	bind_pcvar_float(register_cvar("pre_x", "-1.0"),		g_pCvar[c_iPreHudX]);
+	bind_pcvar_float(register_cvar("pre_y", "0.55"),		g_pCvar[c_iPreHudY]);
+	bind_pcvar_num(register_cvar("pre_hud", "1"),			g_pCvar[c_iPreHud]);
+
+	register_clcmd("say /showpre", "cmdShowPre");
+	register_clcmd("say /pre", "cmdShowPre");
+	register_clcmd("say /showspeed", "cmdShowSpeed");
+	register_clcmd("say /speed", "cmdShowSpeed");
 
 	RegisterHookChain(RG_PM_Move, "rgPM_Move");
 
@@ -250,9 +274,9 @@ public show_prespeed(id, Float:flSpeed) {
 	for (new i = 1; i <= MaxClients; i++) {
 		if (i == id || g_isSpec[i]) {
 			if (g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT)
-				set_hudmessage(0, 250, 60, -1.0, 0.55, 0, 0.0, 1.0, 0.1, 0.0, 1);
+				set_hudmessage(g_pCvar[c_iPreHudDefPerfR], g_pCvar[c_iPreHudDefPerfG], g_pCvar[c_iPreHudDefPerfB], g_pCvar[c_iPreHudX], g_pCvar[c_iPreHudY], 0, 1.0, 0.15, 0.0, 0.0, g_pCvar[c_iPreHud]);
 			else
-				set_hudmessage(250, 250, 250, -1.0, 0.55, 0, 1.0, 0.15, 0.0, 0.0, 1);
+				set_hudmessage(g_pCvar[c_iPreHudDefR], g_pCvar[c_iPreHudDefG], g_pCvar[c_iPreHudDefB], g_pCvar[c_iPreHudX], g_pCvar[c_iPreHudY], 0, 1.0, 0.15, 0.0, 0.0, g_pCvar[c_iPreHud]);
 
 
 			new szSpeed[8];
