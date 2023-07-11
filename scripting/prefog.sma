@@ -48,7 +48,7 @@ new g_eHudPre[MAX_PLAYERS + 1][HUD_PRE];
 
 new bool:g_isPre[MAX_PLAYERS + 1];
 
-new g_bInDuck[MAX_PLAYERS + 1];
+new bool:g_bInDuck[MAX_PLAYERS + 1];
 
 new bool:g_isSpec[MAX_PLAYERS + 1];
 
@@ -67,7 +67,7 @@ enum PRE_CVAR {
 new g_pCvar[PRE_CVAR];
 
 public plugin_init() {
-	register_plugin("PreFog", "3.1.0", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
+	register_plugin("PreFog", "3.1.1", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
 
 	bind_pcvar_num(register_cvar("pre_def_pref_R", "0"),	g_pCvar[c_iPreHudDefPerfR]);
 	bind_pcvar_num(register_cvar("pre_def_pref_G", "250"),	g_pCvar[c_iPreHudDefPerfG]);
@@ -145,7 +145,7 @@ public rgPM_Move(id) {
 	new Float:flMaxSpeed = get_maxspeed(id);
 
 	g_bInDuck[id] = bool:(get_pmove(pm_flags) & FL_DUCKING);
-	static isSgs;
+	static bool:isSgs;
 
 	if (g_bOnOffSpeed[id] || g_bOnOffPre[id])
 		show_prespeed(id, flSpeed);
@@ -154,7 +154,7 @@ public rgPM_Move(id) {
 		iFog++;
 
 		if (iFog == 1) {
-			isSgs = bool:(g_bInDuck[id]);
+			isSgs = g_bInDuck[id];
 		}
 
 		if (!isOldGround) {
