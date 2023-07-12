@@ -78,7 +78,7 @@ new Float:g_flPreSpeed[MAX_PLAYERS + 1];
 new g_iPrevButtons[MAX_PLAYERS + 1];
 new bool:g_isSGS[MAX_PLAYERS + 1];
 
-new bool:g_isSpec[MAX_PLAYERS + 1];
+new g_isSpec[MAX_PLAYERS + 1];
 new Float:g_flHudTime[MAX_PLAYERS + 1];
 new bool:g_isShowPre[MAX_PLAYERS + 1];
 new Float:g_flPreShowTime[MAX_PLAYERS + 1];
@@ -92,7 +92,7 @@ enum PRE_CVAR {
 new g_pCvar[PRE_CVAR];
 
 public plugin_init() {
-	register_plugin("PreFog", "3.2.1", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
+	register_plugin("PreFog", "3.2.2", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
 
 	bind_pcvar_float(register_cvar("pre_x", "-1.0"),		g_pCvar[c_iPreHudX]);
 	bind_pcvar_float(register_cvar("pre_y", "0.55"),		g_pCvar[c_iPreHudY]);
@@ -120,11 +120,19 @@ public client_connect(id) {
 }
 
 public rgPM_Move(id) {
-	if (!is_user_alive(id) || !g_bOnOffPre[id] || !g_bOnOffSpeed[id])
+	if (!g_bOnOffPre[id] || !g_bOnOffSpeed[id])
 		return HC_CONTINUE;
 
-	for (new i = 1; i <= MaxClients; i++) {
-		g_isSpec[i] = is_user_spectating_player(i, id);
+	if (!is_user_alive(id)) {
+		if(get_member(id, m_iObserverLastMode) == OBS_ROAMING)
+			return HC_CONTINUE;
+
+		new iTarget = get_member(id, m_hObserverTarget);
+
+		g_isSpec[id] = iTarget;
+		return HC_CONTINUE;
+	} else {
+		g_isSpec[id] = 0;
 	}
 
 	new bool:isLadder = bool:(get_entvar(id, var_movetype) == MOVETYPE_FLY);
@@ -277,7 +285,7 @@ stock show_prespeed(id, Float:flSpeed, Float:flSpeedDef = 0.0) {
 	}
 
 	for (new i = 1; i <= MaxClients; i++) {
-		if (i == id || g_isSpec[i]) {
+		if (i == id || g_isSpec[i] == id) {
 			set_hudmessage(iColors[0], iColors[1], iColors[2], g_pCvar[c_iPreHudX], g_pCvar[c_iPreHudY], 0, 1.0, 0.15, 0.0, 0.0, g_pCvar[c_iPreHud]);
 
 			if (g_bOnOffPre[i] && g_isShowPre[id]) {
@@ -504,20 +512,4 @@ stock bool:isUserSurfing(id) {
 	get_tr2(0, TR_vecPlaneNormal, dest);
 
 	return dest[2] <= 0.7;
-}
-
-stock bool:is_user_spectating_player(spectator, player) {
-	if(is_user_alive(spectator) || !is_user_alive(player))
-		return false;
-
-	new iSpecMode;
-	iSpecMode = get_entvar(spectator, var_iuser1);
-
-	if(iSpecMode == 3)
-		return false;
-	  
-	if(get_entvar(spectator, var_iuser2) == player)
-		return true;
-	  
-	return false;
 }
