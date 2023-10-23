@@ -92,7 +92,7 @@ enum PRE_CVAR {
 new g_pCvar[PRE_CVAR];
 
 public plugin_init() {
-	register_plugin("PreFog", "3.2.2", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
+	register_plugin("PreFog", "3.2.3", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
 
 	bind_pcvar_float(register_cvar("pre_x", "-1.0"),		g_pCvar[c_iPreHudX]);
 	bind_pcvar_float(register_cvar("pre_y", "0.55"),		g_pCvar[c_iPreHudY]);
@@ -120,7 +120,7 @@ public client_connect(id) {
 }
 
 public rgPM_Move(id) {
-	if (!g_bOnOffPre[id] || !g_bOnOffSpeed[id])
+	if (!g_bOnOffPre[id] && !g_bOnOffSpeed[id])
 		return HC_CONTINUE;
 
 	if (!is_user_alive(id)) {
@@ -177,7 +177,7 @@ public rgPM_Move(id) {
 			new bool:isJump = !isDuck && iOldButtons & IN_JUMP && !(g_iPrevButtons[id] & IN_JUMP);
 
 			if (g_isOldLadder[id]) {
-				format_prest(id, PRE_LADDER, g_flOldSpeed[id]);
+				format_prest(id, PRE_LADDER, flSpeed);
 			} else {
 				if (g_iFog[id] > 10) {
 					if (isDuck) {
@@ -200,6 +200,7 @@ public rgPM_Move(id) {
 								default: iFogType = FOG_VERYBAD;
 							}
 						}
+						format_prest(id, PRE_FOG, g_flOldSpeed[id], g_flPreSpeed[id], g_iFog[id], iFogType);
 					} else if (isDuck) {
 						if (g_isSGS[id]) {
 							switch(g_iFog[id]) {
@@ -216,9 +217,8 @@ public rgPM_Move(id) {
 								default: iFogType = FOG_VERYBAD;
 							}
 						}
+						format_prest(id, PRE_FOG, g_flOldSpeed[id], g_flPreSpeed[id], g_iFog[id], iFogType);
 					}
-					
-					format_prest(id, PRE_FOG, g_flOldSpeed[id], g_flPreSpeed[id], g_iFog[id], iFogType);
 				}
 			}
 		}
@@ -288,7 +288,7 @@ stock show_prespeed(id, Float:flSpeed, Float:flSpeedDef = 0.0) {
 		if (i == id || g_isSpec[i] == id) {
 			set_hudmessage(iColors[0], iColors[1], iColors[2], g_pCvar[c_iPreHudX], g_pCvar[c_iPreHudY], 0, 1.0, 0.15, 0.0, 0.0, g_pCvar[c_iPreHud]);
 
-			if (g_bOnOffPre[i] && g_isShowPre[id]) {
+			if (g_bOnOffPre[i] && g_isShowPre[id] && (g_eHudPre[id][HUD_POST] > 30.0)) {
 				switch (g_eHudPre[id][HUD_TYPE]) {
 					case HUD_FOG: {
 						ShowSyncHudMsg(i, g_iHudObject, "%s^n^n%d %s^n%.2f^n%.2f", g_bOnOffSpeed[i] ? szSpeed : "", g_eHudPre[id][HUD_FOG], g_szFogType[g_eHudPre[id][HUD_FOGTYPE]], g_eHudPre[id][HUD_PREST], g_eHudPre[id][HUD_POST]);
@@ -449,22 +449,22 @@ FormatRGBHud(id, const Float:val, colors[3]) {
 
 	switch (g_eSpeedColorDef[id]) {
 		case CLR_WHITE: {
-			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT ? iColorPerf : {255, 255, 255};
+			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT && g_eHudPre[id][HUD_PREST] > 30.0 ? iColorPerf : {255, 255, 255};
 		}
 		case CLR_GREEN: {
-			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT ? iColorPerf : {0, 250, 0};
+			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT && g_eHudPre[id][HUD_PREST] > 30.0 ? iColorPerf : {0, 250, 0};
 		}
 		case CLR_VIOLET: {
-			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT ? iColorPerf : {250, 0, 250};
+			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT && g_eHudPre[id][HUD_PREST] > 30.0 ? iColorPerf : {250, 0, 250};
 		}
 		case CLR_BLUE: {
-			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT ? iColorPerf : {0, 150, 250};
+			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT && g_eHudPre[id][HUD_PREST] > 30.0 ? iColorPerf : {0, 150, 250};
 		}
 		case CLR_RED: {
-			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT ? iColorPerf : {250, 0, 0};
+			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT && g_eHudPre[id][HUD_PREST] > 30.0 ? iColorPerf : {250, 0, 0};
 		}
 		case CLR_YELLOW: {
-			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT ? iColorPerf : {250, 250, 0};
+			iColorDef = g_eHudPre[id][HUD_FOGTYPE] == FOG_PERFECT && g_eHudPre[id][HUD_PREST] > 30.0 ? iColorPerf : {250, 250, 0};
 		}
 	}
 
