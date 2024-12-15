@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -24,8 +24,28 @@ jobs:
         with:
           version: '1.9.x'
 
+      - name: Setup latest ReAPI includes
+        env:
+          REPO: "rehlds/reapi"
+        run: |
+          mkdir -p dep/reapi
+          cd dep/reapi
+
+          curl \
+            --silent \
+            https://api.github.com/repos/$REPO/releases/latest | \
+            grep "browser_download_url" | \
+            grep -Eo 'https://[^\"]*' | \
+            xargs wget
+
+          7z x *.zip
+
+          echo "REAPI_INCLUDE_PATH=$(pwd)/addons/amxmodx/scripting/include" >> $GITHUB_ENV
+
       - name: Compile plugins
         working-directory: scripting/
+        env:
+          REAPI_INCLUDE: ${{ env.REAPI_INCLUDE_PATH }}
         run: |
           compile() {
             sourcefile=$1
@@ -35,11 +55,12 @@ jobs:
             mkdir -p $(dirname $output_path)
 
             echo -n "Compiling $sourcefile ... "
-            amxxpc "$sourcefile" -o"$output_path" -i"include" && echo "Done"
+            amxxpc "$sourcefile" -o"$output_path" -i"include" -i"$REAPI_INCLUDE" && echo "Done"
           }
           export -f compile
 
           find . -type f -name "*.sma" -exec bash -c 'compile "$0"' {} \;
+          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
