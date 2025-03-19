@@ -1,6 +1,9 @@
 #include <amxmodx>
 #include <reapi>
 #include <fakemeta>
+#include <nvault>
+
+new g_iVault;
 
 new g_iHudObject;
 new bool:g_bOnOffPre[MAX_PLAYERS + 1];
@@ -110,13 +113,60 @@ public plugin_init() {
 	g_iHudObject = CreateHudSyncObj();
 }
 
+public plugin_cfg() {
+	g_iVault = nvault_open("prefog");
+
+	if (g_iVault == INVALID_HANDLE) {
+		log_amx("prefog.sma: plugin_cfg:: can't open file ^"prefog.vault^"!");
+	}
+}
+
 public client_connect(id) {
+	if (g_iVault != INVALID_HANDLE) {
+		new szAuthID[32];
+		get_user_authid(id, szAuthID, charsmax(szAuthID));
+
+		new szData[32], iTimeStamp;
+
+		if (nvault_lookup(g_iVault, szAuthID, szData, charsmax(szData), iTimeStamp)) {
+			new bOnOffSpeed[3], bOnOffPre[3], eSpeedType[3], eSpeedColorPerf[3], eSpeedColorDef[3];
+
+			parse(szData,
+			 bOnOffSpeed, charsmax(bOnOffSpeed),
+			 bOnOffPre, charsmax(bOnOffPre),
+			 eSpeedType, charsmax(eSpeedType),
+			 eSpeedColorPerf, charsmax(eSpeedColorPerf),
+			 eSpeedColorDef, charsmax(eSpeedColorDef));
+
+			g_bOnOffSpeed[id] = str_to_num(bOnOffSpeed) ? true : false;
+			g_bOnOffPre[id] = str_to_num(bOnOffPre) ? true : false;
+			g_eSpeedType[id] = SPEED_TYPE:str_to_num(eSpeedType);
+			g_eSpeedColorPerf[id] = PRE_COLOR:str_to_num(eSpeedColorPerf);
+			g_eSpeedColorDef[id] = PRE_COLOR:str_to_num(eSpeedColorDef);
+
+			nvault_remove(g_iVault, szAuthID);
+		}
+	}
 	g_bOnOffPre[id] = true;
 	g_bOnOffSpeed[id] = true;
 	arrayset(g_eHudPre[id], 0, HUD_PRE);
 	g_eSpeedColorDef[id] = CLR_WHITE;
 	g_eSpeedColorPerf[id] = CLR_GREEN;
 	g_eSpeedType[id] = ST_DEF;
+}
+
+public client_disconnected(id) {
+	if (g_iVault != INVALID_HANDLE) {
+		new szAuthID[32];
+		get_user_authid(id, szAuthID, charsmax(szAuthID));
+
+		new szData[32];
+
+		formatex(szData, charsmax(szData), "^"%d^" ^"%d^" ^"%d^" ^"%d^" ^"%d^"", 
+		g_bOnOffSpeed[id], g_bOnOffPre[id], g_eSpeedType[id], g_eSpeedColorPerf[id], g_eSpeedColorDef[id]);
+
+		nvault_set(g_iVault, szAuthID, szData);
+	}
 }
 
 public rgPM_Move(id) {
