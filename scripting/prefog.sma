@@ -172,6 +172,10 @@ public rgPM_Move(id) {
 			}
 		}
 
+		if (g_iFog[id] == 1) {
+			g_flOldSpeed[id] = flSpeed;
+		}
+
 		if (g_isOldGround[id]) {
 			new bool:isDuck = !g_bInDuck[id] && !(iOldButtons & IN_JUMP) && g_iPrevButtons[id] & IN_DUCK;
 			new bool:isJump = !isDuck && iOldButtons & IN_JUMP && !(g_iPrevButtons[id] & IN_JUMP);
