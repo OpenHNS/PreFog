@@ -92,7 +92,7 @@ enum PRE_CVAR {
 new g_pCvar[PRE_CVAR];
 
 public plugin_init() {
-	register_plugin("PreFog", "3.2.3", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
+	register_plugin("PreFog", "3.2.4", "WessTorn"); // Спасибо: FAME, Destroman, Borjomi, Denzer, Albertio
 
 	bind_pcvar_float(register_cvar("pre_x", "-1.0"),		g_pCvar[c_iPreHudX]);
 	bind_pcvar_float(register_cvar("pre_y", "0.55"),		g_pCvar[c_iPreHudY]);
