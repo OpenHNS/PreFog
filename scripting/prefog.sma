@@ -244,7 +244,7 @@ public rgPM_Move(id) {
 					new FOG_TYPE:iFogType;
 					
 					if (isJump) {
-						if (flSpeed < flMaxSpeed && g_iFog[id] == 1)
+						if (flSpeed < flMaxSpeed && g_iFog[id] == 1 && flSpeed >= 250.0)
 							iFogType = FOG_PERFECT;
 
 						if (!iFogType) {
@@ -258,14 +258,22 @@ public rgPM_Move(id) {
 					} else if (isDuck) {
 						if (g_isSGS[id]) {
 							switch(g_iFog[id]) {
-								case 3: iFogType = FOG_PERFECT;
+								case 3: {
+									if (flSpeed >= 260.0) {
+										iFogType = FOG_PERFECT;
+									}
+								}
 								case 4: iFogType = FOG_GOOD;
 								case 5: iFogType = FOG_BAD;
 								default: iFogType = FOG_VERYBAD;
 							}
 						} else {
 							switch(g_iFog[id]) {
-								case 2: iFogType = FOG_PERFECT;
+								case 2:  {
+									if (flSpeed >= 250.0) {
+										iFogType = FOG_PERFECT;
+									}
+								}
 								case 3: iFogType = FOG_GOOD;
 								case 4: iFogType = FOG_BAD;
 								default: iFogType = FOG_VERYBAD;
@@ -325,7 +333,7 @@ stock show_prespeed(id, Float:flSpeed, Float:flSpeedDef = 0.0) {
 	new iColors[3];
 
 	new Float:val;
-	val = convertToRange(floatmin(flSpeed, 285.0), 40.0, 285.0); // в квар
+	val = convertToRange(floatmin(flSpeed, 285.0), 40.0, 290.0); // в квар
 
 	FormatRGBHud(id, val, iColors);
 
